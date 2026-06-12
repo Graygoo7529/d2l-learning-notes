@@ -212,3 +212,58 @@ $$
 
 > 总结：多个超参数搜索的难点在于组合空间大、单次训练代价高、超参数之间存在相互作用。实践中通常先用随机搜索和少量训练轮数进行粗筛，再对较优配置增加训练资源；对于更大规模任务，可以使用 Hyperband、贝叶斯优化或基于早停的自动搜索方法。
 
+## 模型复杂性
+### 术语定义
+过拟合（overfitting）：模型在训练数据上拟合的比在潜在分布中更接近
+正则化（regularization）：对抗过拟合的技术
+训练误差（training error）：模型在训练数据集上计算得到的误差
+泛化误差（generalization error）：模型应用在从原始样本的分布中抽取的无限多数据样本时，模型误差的期望
+独立同分布假设（i.i.d. assumption）：假设训练数据和测试数据都是从相同的分布中独立提取的；抽取的样本之间没有相关性
+早停（early stopping）：较少训练迭代周期，避免模型过度训练
+$K$ 折交叉验证：原始训练数据被分成 $K$ 个不重叠的子集，每次在  $K-1$ 个子集上进行训练，并在剩余的子集上验证，用于在数据稀缺时构成一个合适的验证集用于进行模型选择
+
+
+### 模型复杂性和泛化
+模型复杂性与样本数量的关系：通常情况下，当有更**复杂**的模型和更少的样本时，训练误差会下降，但泛化误差会增大
+
+一些直观的影响模型泛化的因素有：（1）可调整参数的数量（自由度），当自由度很大时，模型容易过拟合；（2）参数采用的值，当权重的取值范围大时，模型可能容易过拟合；（3）训练样本的数量，当模型表达能力强而样本数量少时，模型容易过拟合
+
+```tikz
+\begin{document}
+\begin{tikzpicture}[domain=0:9, xscale=1.0, yscale=1.0]
+  % axes
+  \draw[->, thick] (0,0) -- (9.2,0) node[below left] {model-complex};
+  \draw[->, thick] (0,0) -- (0,5.2) node[left] {loss};
+
+  % curves
+  \draw[color=black, thick, domain=0.7:8.7, samples=120]
+    plot (\x,{4.4*exp(0-0.42*\x)+0.25});
+
+  \draw[color=black, thick, domain=0.7:8.7, samples=120]
+    plot (\x,{1.85+0.055*(\x-4.4)*(\x-4.4)+1.5*exp(0-0.9*\x)});
+
+  % best vertical line
+  \draw[dashed, thick] (4.3,0) -- (4.3,4.9);
+  \node[above] at (4.3,4.95) {best};
+
+  % top arrows and labels
+  \draw[->, thick] (2.3,4.85) -- (1.0,4.85);
+  \node at (1.6,4.35) {underfitting};
+
+  \draw[->, thick] (5.8,4.85) -- (7.1,4.85);
+  \node at (6.5,4.35) {overfitting};
+
+  % curve labels
+  \node[right] at (7.0,2.6) {generalization-error};
+  \node[right] at (7.0,1.0) {training-error};
+\end{tikzpicture}
+\end{document}
+
+```
+
+
+#### 一个多项式例子用于说明模型复杂性
+目标：给定由单个特征 $\mathbf{x}$ 和对应实数标签 $y$ 组成的训练数据，试图找到一个下面的 $d$ 阶多项式来估计标签 $y$. 其中，特征由 $\mathbf{x}$ 的幂给出，使用 $\frac{x^i}{i!}$ 可以避免很大的特别大的指数值。
+$$\hat{y}= \sum_{i=0}^d \frac{x^i}{i!} w_i$$
+在这个例子中，用多项式阶数来模拟模型复杂度，在固定训练数据集的情况下，高阶多项式函数相对于低阶多项式的训练误差应该始终更低（或相等）。事实上，若有数量为 $d$ 的样本， $d$ 阶多项式可以完美拟合训练集。
+

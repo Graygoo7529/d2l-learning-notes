@@ -183,6 +183,7 @@ Practical notes from tested examples:
 - Start with no point markers. Commands such as `\filldraw`, `circle`, or open/closed point markers may fail depending on the renderer. Add them only after the base plot renders.
 - If a function looks too flat, adjust `xscale` and `yscale` in `\begin{tikzpicture}` rather than changing the function.
 - Add `samples=80` or `samples=100` for smooth curves.
+- Avoid Chinese labels inside TikZ nodes in the current environment. They may cause rendering failure. Prefer English labels in the diagram, and explain Chinese terms in surrounding Markdown text if needed.
 
 Stable sigmoid example:
 
