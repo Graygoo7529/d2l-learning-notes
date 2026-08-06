@@ -273,3 +273,227 @@ $$
 于是模型可以写成 $\hat{y}=\mathbf{w}^{\top}\phi(x)$。它对原始输入 $x$ 是非线性的，但对参数 $\mathbf{w}$ 仍然是线性的。多项式阶数越高，特征空间维度越高，模型可使用的方向越多，能表达的函数集合也越大。因此在固定训练数据上，高阶模型的最小训练误差不会高于低阶模型；更准确地说，若有 $n$ 个不同的输入点，通常存在一个最高 $n-1$ 阶的多项式穿过所有训练样本。
 
 这个例子说明：模型太灵活，而数据太少时，模型会把噪声也当成规律学进去。若真实关系并不需要高阶特征，那么高阶项本应学到接近 0 的权重；但训练数据有限且标签含有随机噪声时，模型无法可靠判断某些波动是真实规律还是偶然噪声，新增的高阶特征维度就可能被用来贴合训练样本中的偶然变化。因此，训练损失可以有效降低，但测试损失仍然很高，最终造成过拟合。
+
+## 权重衰减
+权重衰减也被称为 $L_{2}$ 正则化，通过度量（？如何精确地进行度量）函数与零的距离来衡量函数的复杂度。
+
+一种度量方案是，通过对权重向量的范数来度量其复杂性，例如 $\|\mathbf{w}^2\|$，要使得复杂性小，常用方法是将其范数作为惩罚项加到最小化损失中（即：训练目标为最小化预测损失和惩罚项之和）。考虑损失函数 $L$，其中， $\mathbf{x}^{(i)}$ 是样本 $i$ 的特征，$\mathbf{y}^{(i)}$ 是样本 $i$ 的标签，引入 $L_2$ 惩罚项和正则化常数超参数 $\lambda$：
+
+$$
+L(\mathbf{w},b) = \frac{1}{n} \sum_{i=1}^n \frac{1}{2} 
+\left(
+\mathbf{w}^\top \mathbf{x}^{(i)} + b - y^{(i)}
+\right)
+$$
+$$
+L(\mathbf{w},b)+ \frac{\lambda}{2}\|\mathbf{w}\|^{2}.
+$$
+对于$\lambda > 0$，训练目标将限制 $\| \mathbf{w} \|$ 的大小。使用平方范数（而非欧几里得距离）是为了便于计算：惩罚项各分量导数的和等于和的导数；使用  $L_{2}$  范数（岭回归）而不是 $L_{1}$ 范数（套索回归），是因为它对权重向量的大分量施加了巨大的惩罚，使算法偏向于在大量特征上均匀分布权重的模型； $L_{1}$ 相比之下容易使权重集中于一小部分特征上（特征选择）。
+
+$L_{2}$ 正则化回归的小批量梯度下降更新如下：
+$$
+\begin{aligned}
+\mathbf{w} & \leftarrow 
+\left( 1 - \eta \lambda \right) \mathbf{w} 
+- \frac{\eta}{|\mathcal{B}|} \sum_{{i} \in \mathcal{B}} 
+\mathbf{x}^{(i)} \left(\mathbf{w}^\top \mathbf{x}^{(i)} +b - y^{(i)} \right).
+
+\end{aligned}
+
+$$
+是否对偏置 $b^2$ 进行惩罚在不同场景下有所区别，一般地，不会在网络输出层的偏置项进行正则化。
+
+### L1 与 L2 正则化的效果区别
+岭回归通常使用平方 $L_2$ 范数，套索回归使用 $L_1$ 范数，对应的正则化项分别为：
+$$
+R_{L_2}(\mathbf{w})
+=
+\frac{\lambda}{2}\sum_j w_j^2,
+\qquad
+R_{L_1}(\mathbf{w})
+=
+\lambda\sum_j |w_j|.
+$$
+当 $w_j\neq0$ 时，两种惩罚项关于权重的导数为：
+$$
+\frac{\partial R_{L_2}}{\partial w_j}=\lambda w_j,
+\qquad
+\frac{\partial R_{L_1}}{\partial w_j}=\lambda\operatorname{sign}(w_j).
+$$
+$L_2$ 的惩罚力度随 $|w_j|$ 增大，因此会更强地压制大权重；但当权重接近零时，惩罚梯度也接近零，所以通常只会将权重缩小，而不会使其精确等于零。$L_1$ 的惩罚梯度大小始终为 $\lambda$，即使权重已经很小，仍然受到固定大小的收缩，因此更容易被推到零。
+
+$L_1$ 在 $w_j=0$ 处不可导，其次梯度为：
+$$
+\partial |w_j|=[-1,1].
+$$
+因此，只要损失函数在该位置的梯度满足：
+$$
+\left|\frac{\partial L}{\partial w_j}\right|\leq\lambda,
+$$
+就可以令 $w_j=0$ 并满足最优条件。相比之下，$L_2$ 要在 $w_j=0$ 处满足最优条件，通常要求 $\frac{\partial L}{\partial w_j}=0$，这一条件更加严格。因此，$L_1$ 容易得到包含大量零权重的稀疏模型，可用于特征选择；$L_2$ 通常得到许多较小但非零的权重。
+
+还可以从相关特征之间的权重分配理解这种区别。假设两个作用相近的特征只需要满足 $w_1+w_2=c$，且 $w_1,w_2\geq0$。对于 $L_2$：
+$$
+c^2+0^2=c^2,
+\qquad
+\left(\frac{c}{2}\right)^2+\left(\frac{c}{2}\right)^2=\frac{c^2}{2}.
+$$
+均匀分配权重具有更小的平方和，因此 $L_2$ 明确偏向于让相关特征共同承担权重。对于 $L_1$：
+$$
+|w_1|+|w_2|=c,
+$$
+不同的非负分配方式具有相同惩罚，$L_1$ 不会因为均匀分配而降低代价；结合其在零点处的尖点，最优解更容易落在坐标轴上，只保留少数特征。
+
+> 总结：$L_2$ 的梯度随权重大小变化，因此强烈压制大权重，却很少产生精确的零，并且倾向于在相关特征之间分散权重；$L_1$ 在零点附近仍保持固定的收缩力度，而且零点具有一个次梯度区间，因此可以把弱特征的权重直接压到零，形成稀疏解。
+
+### 从向量的 L2 范数推广到矩阵的 Frobenius 范数
+
+对于列向量 $\mathbf{w}\in\mathbb{R}^d$，$L_2$ 范数平方可以写成向量内积：
+$$
+\|\mathbf{w}\|_2^2
+=
+\sum_{i=1}^d w_i^2
+=
+\mathbf{w}^\top\mathbf{w}.
+$$
+由于 $\mathbf{w}^\top\mathbf{w}$ 的形状为 $1\times1$，所以结果是一个标量。对于矩阵 $\mathbf{W}\in\mathbb{R}^{m\times n}$，Frobenius 范数定义为矩阵所有元素平方和的平方根：
+$$
+\|\mathbf{W}\|_F
+=
+\sqrt{\sum_{i=1}^m\sum_{j=1}^n W_{ij}^2}.
+$$
+因此，Frobenius 范数的平方就是矩阵所有元素的平方和：
+$$
+\|\mathbf{W}\|_F^2
+=
+\sum_{i=1}^m\sum_{j=1}^n W_{ij}^2.
+$$
+考察矩阵乘积 $\mathbf{W}^\top\mathbf{W}$，形状为 $n\times n$，第 $j$ 个对角元素恰好是 $\mathbf{W}$ 第 $j$ 列元素的平方和；对该矩阵取迹，就能进一步将所有列的平方和汇总为一个标量：
+$$
+\begin{aligned}
+\operatorname{tr}(\mathbf{W}^\top\mathbf{W})
+&=
+\sum_{j=1}^n(\mathbf{W}^\top\mathbf{W})_{jj}\\
+&=
+\sum_{j=1}^n\sum_{i=1}^m W_{ij}^2\\
+&=
+\|\mathbf{W}\|_F^2.
+\end{aligned}
+$$
+由此可见，Frobenius 范数的平方可以通过矩阵乘法和迹运算计算：
+$$
+\|\mathbf{W}\|_F^2
+=
+\operatorname{tr}(\mathbf{W}^\top\mathbf{W})
+$$
+
+若权重是矩阵，矩阵形式的 $L_2$ 正则项可以写成：
+$$
+\frac{\lambda}{2}\|\mathbf{W}\|_F^2
+=
+\frac{\lambda}{2}\operatorname{tr}(\mathbf{W}^\top\mathbf{W}).
+$$
+该正则项关于 $\mathbf{W}$ 的梯度为：
+$$
+\nabla_{\mathbf{W}}
+\frac{1}{2}\|\mathbf{W}\|_F^2
+=
+\mathbf{W}.
+$$
+因此，矩阵权重同样具有权重衰减更新：
+$$
+\mathbf{W}
+\leftarrow
+(1-\eta\lambda)\mathbf{W}
+-
+\eta\nabla_{\mathbf{W}}L.
+$$
+
+### 正则化的贝叶斯解释
+设训练数据为 $\mathcal{D}=(\mathbf{X},\mathbf{y})$，模型参数为 $\mathbf{w}$。从概率角度看，似然 $P(\mathcal{D}\mid\mathbf{w})$ 表示：给定参数 $\mathbf{w}$ 后，观察到当前训练数据的可能性。
+
+#### 最大似然估计
+最大似然估计（maximum likelihood estimation，MLE）选择最能解释训练数据的参数：
+$$
+\mathbf{w}_{\mathrm{MLE}}
+=
+\operatorname*{argmax}_{\mathbf{w}}
+P(\mathcal{D}\mid\mathbf{w}).
+$$
+为了便于计算，通常将最大化似然转化为最小化负对数似然：
+$$
+\mathbf{w}_{\mathrm{MLE}}
+=
+\operatorname*{argmin}_{\mathbf{w}}
+\left[-\log P(\mathcal{D}\mid\mathbf{w})\right].
+$$
+因此，许多常见损失函数都可以理解为负对数似然。例如，在线性回归中假设标签噪声服从正态分布，最小化负对数似然就等价于最小化平方误差。
+
+最大似然估计只考虑参数对训练数据的拟合程度。当数据量较少或模型表达能力很强时，某些复杂参数可能很好地解释训练数据中的偶然噪声，从而造成过拟合。
+
+#### 最大后验估计
+贝叶斯方法在观察数据之前，先用参数的先验分布 $P(\mathbf{w})$ 表示对参数取值的已有假设。观察训练数据后，根据贝叶斯公式得到后验分布：
+$$
+P(\mathbf{w}\mid\mathcal{D})
+=
+\frac{P(\mathcal{D}\mid\mathbf{w})P(\mathbf{w})}{P(\mathcal{D})}
+\propto
+P(\mathcal{D}\mid\mathbf{w})P(\mathbf{w}).
+$$
+最大后验估计（maximum a posteriori estimation，MAP）选择后验概率最大的参数：
+$$
+\begin{aligned}
+\mathbf{w}_{\mathrm{MAP}}
+&=
+\operatorname*{argmax}_{\mathbf{w}}
+P(\mathbf{w}\mid\mathcal{D})\\
+&=
+\operatorname*{argmin}_{\mathbf{w}}
+\left[
+-\log P(\mathcal{D}\mid\mathbf{w})
+-\log P(\mathbf{w})
+\right].
+\end{aligned}
+$$
+其中，$P(\mathcal{D})$ 不依赖于 $\mathbf{w}$，所以不会影响最优参数。上式正好具有“预测损失 + 正则化项”的形式：
+$$
+\underbrace{-\log P(\mathcal{D}\mid\mathbf{w})}_{\text{预测损失}}
++
+\underbrace{-\log P(\mathbf{w})}_{\text{正则化项}}.
+$$
+这说明正则化项可以解释为参数先验的负对数。正则化不是只要求模型拟合训练数据，还要求参数符合预先设定合理取值范围。
+
+#### $L_2$ 正则化与高斯先验
+若假设权重服从零均值、各向同性的高斯先验：
+$$
+P(\mathbf{w})
+\propto
+\exp\left(-\frac{\lambda}{2}\|\mathbf{w}\|_2^2\right),
+$$
+则其负对数为：
+$$
+-\log P(\mathbf{w})
+=
+\frac{\lambda}{2}\|\mathbf{w}\|_2^2+C.
+$$
+去掉与参数无关的常数 $C$，就得到 $L_2$ 正则项。因此，$L_2$ 正则化相当于加入“权重通常应当分布在零附近”的先验假设。$\lambda$ 越大，高斯先验越集中于零附近，对大权重的限制越强。
+
+#### $L_1$ 正则化与拉普拉斯先验
+若假设各个权重相互独立并服从零均值拉普拉斯先验：
+$$
+P(\mathbf{w})
+\propto
+\exp\left(-\lambda\|\mathbf{w}\|_1\right),
+$$
+则：
+$$
+-\log P(\mathbf{w})
+=
+\lambda\|\mathbf{w}\|_1+C.
+$$
+这对应 $L_1$ 正则化。拉普拉斯分布在零点处具有尖峰，因此其最大后验解更容易将较弱的权重压到零，产生稀疏模型。
+
+需要注意，先验分布参数与正则化系数之间的精确关系还取决于损失采用求和还是平均，以及似然中的噪声方差。例如在线性回归中，若噪声方差为 $\sigma^2$、高斯先验方差为 $\tau^2$，将目标函数缩放为普通平方误差后，正则化强度满足 $\lambda=\sigma^2/\tau^2$。
+
+> 总结：最大似然估计只选择最能解释训练数据的参数；最大后验估计还会考虑参数先验。取负对数后，似然变成预测损失，先验变成正则化项。因此，无正则化训练通常对应最大似然估计，带正则化训练可以解释为最大后验估计；$L_2$ 正则化对应高斯先验，$L_1$ 正则化对应拉普拉斯先验。
+
