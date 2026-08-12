@@ -68,8 +68,14 @@ $$\operatorname{pReLU}(x) = \max(0, x) + \alpha \min(0, x).$$
 
 #### sigmoid 激活函数
 对于一个定义域在 $\mathbb{R}$ 中的输入，sigmoid 函数将输入变换为区间(0, 1)上的输出。sigmoid 源于对生物神经元“激发”或“不激发”进行建模，它是一个平滑的、可微的阈值单元近似。
-$$\operatorname{sigmoid}(x) = \frac{1}{1 + \exp(-x)}.$$
-$$\frac{d}{dx} \operatorname{sigmoid}(x) = \frac{\exp(-x)}{(1 + \exp(-x))^2} = \operatorname{sigmoid}(x)\left(1-\operatorname{sigmoid}(x)\right).$$
+$$
+\begin{align} 
+&\operatorname{sigmoid}(x) = \frac{1}{1 + \exp(-x)}.\\
+
+&\frac{d}{dx} \operatorname{sigmoid}(x)  \\
+&= \frac{\exp(-x)}{(1 + \exp(-x))^2}  \\
+&= \operatorname{sigmoid}(x)\left(1-\operatorname{sigmoid}(x)\right).
+\end{align}$$
 
 sigmoid 导数如公式和图像所示。当输入为 0，sigmoid函数的导数达到最大值 0.25；当输入在任一方向上越远离 0 点时，导数越接近 0。
 
@@ -356,13 +362,12 @@ $$
 =
 \mathbf{w}^\top\mathbf{w}.
 $$
-由于 $\mathbf{w}^\top\mathbf{w}$ 的形状为 $1\times1$，所以结果是一个标量。对于矩阵 $\mathbf{W}\in\mathbb{R}^{m\times n}$，Frobenius 范数定义为矩阵所有元素平方和的平方根：
+由于 $\mathbf{w}^\top\mathbf{w}$ 的形状为 $1\times1$，所以结果是一个标量。对于矩阵 $\mathbf{W}\in\mathbb{R}^{m\times n}$，Frobenius 范数定义为矩阵所有元素平方和的平方根，即将矩阵展平为向量后应用 $L_2$ 范数；Frobenius 范数的平方就是矩阵所有元素的平方和：
 $$
 \|\mathbf{W}\|_F
 =
 \sqrt{\sum_{i=1}^m\sum_{j=1}^n W_{ij}^2}.
 $$
-因此，Frobenius 范数的平方就是矩阵所有元素的平方和：
 $$
 \|\mathbf{W}\|_F^2
 =
@@ -380,14 +385,7 @@ $$
 \|\mathbf{W}\|_F^2.
 \end{aligned}
 $$
-由此可见，Frobenius 范数的平方可以通过矩阵乘法和迹运算计算：
-$$
-\|\mathbf{W}\|_F^2
-=
-\operatorname{tr}(\mathbf{W}^\top\mathbf{W})
-$$
-
-若权重是矩阵，矩阵形式的 $L_2$ 正则项可以写成：
+由此可见，Frobenius 范数的平方可以通过矩阵乘法和迹运算计算，若权重是矩阵，矩阵形式的 $L_2$ 正则项可以写成：
 $$
 \frac{\lambda}{2}\|\mathbf{W}\|_F^2
 =
@@ -502,7 +500,7 @@ $$
 
 论文方法通过无偏向方式注入噪声：将均值为零分布 $\epsilon  \sim \mathcal{N} (0, \sigma^2)$ 的高斯噪声添加到线性模型的输入 $\mathbf{x}$ 中，产生扰动 $\mathbf{x}' = \mathbf{x} + \epsilon$，预期是 $E[\mathbf{x}'] = \mathbf{x}$. 
 
-在标准暂退法中，随机丢弃一部分隐藏单元（制造噪声），同时放大未被丢弃的单元，使激活值的期望保持不变。设丢弃概率为 $p$，暂退后的激活值 $h'$ 可以写为： 
+在标准暂退法中，随机丢弃一部分隐藏单元（制造噪声），同时放大未被丢弃的单元，使激活值（激活函数之后、暂退法之前的隐藏层中间变量）期望保持不变。设丢弃概率为 $p$，暂退后的激活值 $h'$ 可以写为： 
 
 $$
 \begin{aligned}
@@ -635,7 +633,7 @@ $$
 
 因此，普通暂退法产生由神经元子集组成的随机网络，主要限制模型对完整特征的依赖；DropConnect 产生由连接子集组成的随机网络，主要限制模型对特定连接的依赖。后者的扰动更细粒度，但需要生成和处理与权重矩阵同形状的掩码，计算和存储开销通常更大。
 
-对单个预激活分量 $z_k=\sum_jx_jW_{jk}$，DropConnect 的权重掩码带来的条件方差为：
+对中间变量（第 $k$ 个神经元的预激活值） $z_k=\sum_jx_jW_{jk}$，DropConnect 的权重掩码带来的条件方差为：
 $$
 \operatorname{Var}(z'_k\mid\mathbf{x},\mathbf{W})
 =
@@ -649,4 +647,20 @@ $$
 以带权重衰减的单隐藏层多层感知机为例，说明反向传播的细节。梯度自动计算，即自动微分，简化了深度学习算法实现。
 
 ### 前向传播
-前向传播：按顺序从输入层到输出层，计算和存储神经网络中每层的结果。假设输入样本为 $\mathbf{x} \in \mathbb{R}^d$，且隐藏层不包含偏置项；设
+前向传播：按顺序从输入层到输出层，计算和存储神经网络中每层的结果。假设输入样本为 $\mathbf{x} \in \mathbb{R}^d$，且隐藏层不包含偏置项；设 $\mathbf{W}^{(1)} \in \mathbb{R}^{h \times d}$ 是隐藏层的权重参数，将中间变量 $\mathbf{z} \in \mathbb{R}^h$ 提供激活函数 $\phi$ 后，得到长度为 $h$ 的隐藏激活向量 $\mathbf{h} \in \mathbb{R}^h$；设输出层的权重参数为 $\mathbf{W}^{(2)} \in \mathbb{R}^{q \times h}$，得到输出层变量 $\mathbf{o} \in \mathbb{R}^q$.
+$$
+\begin{align}
+\mathbf{z} = \mathbf{W}^{(1)}\mathbf{x} \\ 
+\mathbf{h} = \phi(\mathbf{z}) \\
+\mathbf{o} = \mathbf{W}^{(2)}\mathbf{h}.
+\end{align}
+$$
+假设 $l$ 为损失函数， $y$ 为样本标签，计算单个数据样本的损失项
+$$
+L = l(\mathbf{o},y)
+$$
+权重矩阵使用 Frobenius 范数，给定超参数 $\lambda$ 正则化项（$L2$）为：
+$$
+s = \frac{\lambda}{2}(\|\mathbf{W}^{(1)}\|_{F}^2 + \|\mathbf{W}^{(2)}\|_{F}^2)
+$$
+
