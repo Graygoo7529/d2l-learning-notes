@@ -614,6 +614,7 @@ $$
 
 \end{align}
 $$
+
 第二项具有 $L_2$ 正则化的形式，说明暂退法在该情形下会产生一种与输入特征尺度有关的权重惩罚。但在包含带有 ReLU 等非线性激活函数的深层网络中，暂退法通常不等价于固定的 $L_2$ 正则项。
 
 因此，二者在作用机制上是互补的：暂退法要求表示在部分神经元缺失时仍然有效，权重衰退则要求这种表示不依赖过大的参数。暂退法产生的随机子网络可能促使模型增大某些权重来补偿被丢弃的激活值，权重衰退可以抑制这种补偿；反过来，仅使用权重衰退并不能阻止模型始终依赖同一组神经元。
@@ -752,3 +753,41 @@ $$
 &= \frac{ \partial J}{ \partial \mathbf{z}} \mathbf{x} ^ {\top} + \lambda \mathbf{W}^{(1)} .
 \end{align}
 $$
+以上案例展示了单隐藏层多层感知机反向传播的计算过程，反向传播从损失关于输出 $\mathbf{o}$ 的梯度开始，沿前向传播的相反方向应用链式法则。对于输出层，将输出误差与隐藏层变量 $\mathbf{h}$ 结合，得到 $\frac{\partial J}{\partial\mathbf{W}^{(2)}}$；对于隐藏层，先将梯度从 $\mathbf{o}$ 传回 $\mathbf{h}$，再乘以激活函数导数得到 $\frac{\partial J}{\partial\mathbf{z}}$，最后与输入 $\mathbf{x}$ 结合，得到 $\frac{\partial J}{\partial\mathbf{W}^{(1)}}$。优化算法据此更新 $\mathbf{W}^{(1)}$ 和 $\mathbf{W}^{(2)}$，使预测损失下降；其中叠加的 $\lambda\mathbf{W}^{(1)}$ 和 $\lambda\mathbf{W}^{(2)}$ 同时使权重向零收缩。
+
+### 训练神经网络
+在训练神经网络时，前向传播和反向传播相互依赖。一方吗，前向传播期间计算正则项取决于模型参数的当前值，它们是由优化算法根据最近迭代的反向传播给出的；另一方面，反向传播期间参数的梯度计算，取决于当前前向传播给出的隐藏层变量 $\mathbf{h}$ 的当前值。
+
+因此，在初始化模型参数后，交替使用前向传播和反向传播，利用反向传播给出的梯度来更新模型参数。反向传播时，重复利用前向传播中存储的中间值，以避免重复计算。换言之，我们需要保存中间值直到反向传播完成，这也是训练比预测需要更多内存的原因之一。
+
+### 矩阵变量的梯度形状
+若标量函数 $f$ 的输入是矩阵 $\mathbf{X}\in\mathbb{R}^{n\times m}$，矩阵中的每个元素 $X_{ij}$ 都会影响函数值，因此需要分别计算 $f$ 关于每个元素的偏导数。将这些偏导数放回对应位置，就得到：
+$$
+\nabla_{\mathbf{X}}f
+=
+\frac{\partial f}{\partial\mathbf{X}}
+=
+\begin{bmatrix}
+\frac{\partial f}{\partial X_{11}} & \cdots & \frac{\partial f}{\partial X_{1m}}\\
+\vdots & \ddots & \vdots\\
+\frac{\partial f}{\partial X_{n1}} & \cdots & \frac{\partial f}{\partial X_{nm}}
+\end{bmatrix}
+\in\mathbb{R}^{n\times m}.
+$$
+可以把梯度看作贴在原矩阵上的一张“变化率表”：$X_{ij}$ 所在的位置，对应记录 $\frac{\partial f}{\partial X_{ij}}$。例如输入是 $2\times3$ 矩阵，就有 $6$ 个元素和 $6$ 个对应的偏导数，因此梯度仍是 $2\times3$ 矩阵。
+
+梯度与输入保持相同形状，才能逐元素更新矩阵：
+$$
+\mathbf{X}
+\leftarrow
+\mathbf{X}-\eta\nabla_{\mathbf{X}}f.
+$$
+同理，若某层权重 $\mathbf{W}^{(1)}\in\mathbb{R}^{h\times d}$，则其梯度也满足：
+$$
+\frac{\partial J}{\partial\mathbf{W}^{(1)}}
+\in
+\mathbb{R}^{h\times d}.
+$$
+梯度中的每个位置说明：轻微改变对应权重时，目标函数 $J$ 会沿哪个方向、以多快的速度变化。
+
+
