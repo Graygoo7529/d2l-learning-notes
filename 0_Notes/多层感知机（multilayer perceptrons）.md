@@ -1,3 +1,9 @@
+> 对 《动手学深度学习》 的学习笔记
+> 主要内容为知识的概述、习题、自己的思考
+> 关注原理、减少对于代码实现的考虑
+
+参考：[多层感知机 — 动手学深度学习](https://zh-v2.d2l.ai/chapter_multilayer-perceptrons/index.html)
+
 ## 多层感知机基础
 ### 隐藏层
 回顾仿射变换： $\hat{y} = w_{1}x_{1} + ... + w_{d} x_{d} +b.$
@@ -400,11 +406,20 @@ $$
 $$
 因此，矩阵权重同样具有权重衰减更新：
 $$
-\mathbf{W}
-\leftarrow
-(1-\eta\lambda)\mathbf{W}
+\begin{aligned}
+\mathbf W
+&\leftarrow
+\mathbf W-\eta\nabla_{\mathbf W}J\\
+&=
+\mathbf W-\eta
+\left(
+\nabla_{\mathbf W}L+\lambda\mathbf W
+\right)\\
+&=
+(1-\eta\lambda)\mathbf W
 -
-\eta\nabla_{\mathbf{W}}L.
+\eta\nabla_{\mathbf W}L.
+\end{aligned}
 $$
 
 ### 正则化的贝叶斯解释
@@ -647,7 +662,7 @@ $$
 以带权重衰减的单隐藏层多层感知机为例，说明反向传播的细节。梯度自动计算，即自动微分，简化了深度学习算法实现。
 
 ### 前向传播
-前向传播：按顺序从输入层到输出层，计算和存储神经网络中每层的结果。假设输入样本为 $\mathbf{x} \in \mathbb{R}^d$，且隐藏层不包含偏置项；设 $\mathbf{W}^{(1)} \in \mathbb{R}^{h \times d}$ 是隐藏层的权重参数，将中间变量 $\mathbf{z} \in \mathbb{R}^h$ 提供激活函数 $\phi$ 后，得到长度为 $h$ 的隐藏激活向量 $\mathbf{h} \in \mathbb{R}^h$；设输出层的权重参数为 $\mathbf{W}^{(2)} \in \mathbb{R}^{q \times h}$，得到输出层变量 $\mathbf{o} \in \mathbb{R}^q$.
+**前向传播**：按顺序从输入层到输出层，计算和存储神经网络中每层的结果。假设输入样本为 $\mathbf{x} \in \mathbb{R}^d$，且隐藏层不包含偏置项；设 $\mathbf{W}^{(1)} \in \mathbb{R}^{h \times d}$ 是隐藏层的权重参数，将中间变量 $\mathbf{z} \in \mathbb{R}^h$ 提供激活函数 $\phi$ 后，得到长度为 $h$ 的隐藏激活向量 $\mathbf{h} \in \mathbb{R}^h$；设输出层的权重参数为 $\mathbf{W}^{(2)} \in \mathbb{R}^{q \times h}$，得到输出层变量 $\mathbf{o} \in \mathbb{R}^q$.
 $$
 \begin{align}
 \mathbf{z} = \mathbf{W}^{(1)}\mathbf{x} \\ 
@@ -655,7 +670,7 @@ $$
 \mathbf{o} = \mathbf{W}^{(2)}\mathbf{h}.
 \end{align}
 $$
-假设 $l$ 为损失函数， $y$ 为样本标签，计算单个数据样本的损失项
+假设 $l$ 为损失函数， $y$ 为样本标签，计算单个数据样本损失项:
 $$
 L = l(\mathbf{o},y)
 $$
@@ -663,4 +678,77 @@ $$
 $$
 s = \frac{\lambda}{2}(\|\mathbf{W}^{(1)}\|_{F}^2 + \|\mathbf{W}^{(2)}\|_{F}^2)
 $$
+称模型在给定数据样本上的正则化损失为 $J$ 目标函数：
+$$
+J=L+s.
+$$
 
+### 反向传播
+**反向传播**：计算神经网络参数梯度的方法。该方法根据微积分链式规则，按照相反的顺序从输出层到输入层遍历网络，在此过程中存储计算参数梯度所需的中间变量（偏导数）。
+
+使用 $prod$ 运算符在执行必要操作（换位和交换输入位置）后将其参数相乘，对于向量即矩阵乘法。假设有函数 $Y = f(x)$ 和函数 $Z = g(Y)$，函数的输入和输出可以任意形状的张量。计算 $Z$ 关于 $X$ 的导数：
+$$
+\frac{ \partial \mathsf{Z} }{\partial \mathsf{X}}
+= prod(
+\frac{ \partial \mathsf{Z} }{\partial \mathsf{Y}},
+\frac{ \partial \mathsf{Y} }{\partial \mathsf{X}}
+) .
+$$
+考虑单隐藏层的网络参数 $\mathbf{W}^{(1)}$ 和 $\mathbf{W}^{(2)}$，反向传播需要计算梯度 $\frac{ \partial J}{\partial \mathbf{W}^{(1)}}$ 和  $\frac{ \partial J}{\partial \mathbf{W}^{(2)}}$，为此应用链式法则，依次计算每个中间变量和参数的梯度，计算顺序与前向传播执行顺序相反，首先，计算目标函数 $J=L+s$ 相对于损失项 $L$ 和正则项 $s$ 的梯度：
+$$
+\frac{\partial J}{\partial L} = 1, 
+\frac{\partial J}{\partial s} = 1.
+$$
+然后，计算目标函数 $J$ 关于输出层变量 $\mathbf{o}$ 的梯度，有：
+$$
+\begin{align}
+\frac{ \partial J}{ \partial \mathbf{o}} &= prod(\frac{ \partial J}{ \partial L}, \frac{ \partial L}{ \partial \mathbf{o}}) \\
+&=\frac{ \partial L}{ \partial \mathbf{o}} \in \mathbb{R}^q.
+\end{align}
+$$
+接下来计算损失项 $L$ 关于输出层参数 $\mathbf{W}^{(2)}$ 的梯度：
+$$
+\frac{\partial L}{\partial \mathbf{W}^{(2)}} 
+= prod(\frac{ \partial L}{ \partial \mathbf{o}}, \frac{ \partial \mathbf{o}}{ \partial \mathbf{W}^{(2)}}) 
+= \frac{ \partial L}{ \partial \mathbf{o}} \mathbf{h}^ \top
+$$
+接下来计算正则化项 $s$ 关于两个参数的梯度：
+$$
+\frac{\partial s}{\partial \mathbf{W}^{(1)}} = \lambda \mathbf{W}^{(1)}, 
+\frac{\partial s}{\partial \mathbf{W}^{(2)}} = \lambda \mathbf{W}^{(2)}.
+$$
+现在即可计算目标函数 $J$ 关于输出层参数 $\mathbf{W}^{(2)}$ 的梯度：
+$$
+\begin{align}
+\frac{ \partial J}{ \partial \mathbf{W}^{(2)}}
+&= prod(\frac{ \partial J}{ \partial L}, \frac{ \partial L}{ \partial \mathbf{W}^{(2)}})   
++ prod(\frac{ \partial J}{ \partial s}, \frac{ \partial s}{ \partial \mathbf{W}^{(2)}})\\
+&=\frac{ \partial L}{ \partial \mathbf{o}} \mathbf{h}^ \top
++ \lambda \mathbf{W}^{(2)} 
+= \frac{ \partial J}{ \partial \mathbf{o}} \mathbf{h}^ \top
++ \lambda \mathbf{W}^{(2)} .
+\end{align}
+$$
+为了继续求取关于隐藏层参数 $\mathbf{W}^{(1)}$ 的梯度，继续沿着输出层到隐藏层反向传播，先求取关于隐藏层输出 $\mathbf{h}$ 的梯度：
+$$
+\begin{align}
+\frac{ \partial J}{ \partial \mathbf{h}}
+&= prod(\frac{ \partial J}{ \partial \mathbf{o}}, \frac{ \partial \mathbf{o}}{ \partial \mathbf{h}}) 
+={\mathbf{W}^{(2)}}^\top \frac{ \partial J}{ \partial \mathbf{o}} .
+\end{align}
+$$
+正向传播时 $\mathbf{W}^{(1)} \mathbf{x} \to \mathbf{z} \to \mathbf{h}$，其中从预激活的中间变量 $\mathbf{z}$ 到隐藏层变量 $\mathbf{h}$ 的激活函数 $\phi$ 是按元素计算，用 $\odot$ 便是按元素乘法运算符，计算关于中间变量 $\mathbf{z}$ 的梯度：
+$$
+\frac{ \partial J}{ \partial \mathbf{z}} 
+= prod(\frac{ \partial J}{ \partial \mathbf{h}}, \frac{ \partial \mathbf{h}}{ \partial \mathbf{z}}) 
+= \frac{ \partial J}{ \partial \mathbf{h}} \odot \phi'(\mathbf{z}) \in \mathbb{R} ^ h .
+$$
+最后，可以求出目标函数 $J$ 关于隐藏层参数 $\mathbf{W}^{(1)}$ 的梯度  $\frac{ \partial J}{\partial \mathbf{W}^{(1)}} \in \mathbb{R}^{h \times d}$ , 根据链式法则计算出：
+$$
+\begin{align}
+\frac{ \partial J}{\partial \mathbf{W}^{(1)}} 
+&= prod(\frac{ \partial J}{ \partial \mathbf{z}}, \frac{ \partial \mathbf{z}}{ \partial \mathbf{W}^{(1)}}) 
++ prod(\frac{ \partial J}{ \partial s}, \frac{ \partial s}{ \partial \mathbf{W}^{(1)}}) \\
+&= \frac{ \partial J}{ \partial \mathbf{z}} \mathbf{x} ^ {\top} + \lambda \mathbf{W}^{(1)} .
+\end{align}
+$$
