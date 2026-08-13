@@ -886,81 +886,6 @@ $$
 
 梯度爆炸：参数更新过大，破坏模型的稳定收敛；以生成 100 个 $\sigma^2 = 1$ 的高斯随机矩阵为例，将它们与初始矩阵相乘，使矩阵乘积发生爆炸；这种情况常常由于网络初始化导致，最终无法能够使梯度下降优化器收敛。
 
-### 网络对称性与参数初始化
-神经网络中一个设计问题是参数化的排列对称性：如果多个隐藏单元从完全相同的参数出发，它们会进行相同的计算、获得相同的梯度，并在训练中始终保持相同。这样，多个神经元实际上只相当于一个神经元。
-
-小批量随机梯度下降不会打破这种对称性，因为即使使用不同的小批量，两个单元在同一个小批量上看到的样本仍然相同。暂退法产生的随机噪声能够打破训练过程中的完全同步状态，但仍需使用合理的随机初始化来减轻网络结构上的排列对称性。
-
-#### Xavier 初始化
-Xavier 初始化的作用是：（1）减轻同步状态；（2）控制前向传播中激活值和反向传播中梯度的大小，提升数值稳定性。
-
-假设没有使用非线性的全连接层输出 $o_{i} = \sum_{j=1}^{n_{in}} w_{ij} x_{j} .$
-权重 $w_{ij}$ 从同一分布中独立抽取，假设该分布具有零均值和方差 $\sigma^2$，这不意味着必须是高斯分布，只是均值和方差需要存在；假设输入层 $x_{j}$ 也具有零均值和方差 $\gamma^2$，并且它们独立于 $w_{ij}$ 且彼此独立；下面据此计算 $o_{i}$ 的均值和方差：
-$$
-\begin{align}
-E[o_{i}] & = \sum_{j=1}^{n_{\mathrm{in}}} E[w_{ij} x_{j}] \\
-& = \sum_{j=1}^{n_{\mathrm{in}}} E[w_{ij} ] E[x_{j}] \\
-& = 0. \\ 
-\end{align}
-$$
-$$
-\begin{align}
-Var[o_{i}] &= E[o_{i}^2] - (E[o_{i}])^2  \\
-&= \sum_{j=1}^{n_{\mathrm{in}}}E[w_{ij}^2x_{j}^2] - 0 \\
-&= \sum_{j=1}^{n_{\mathrm{in}}}E[w_{ij}^2]E[x_{j}^2] \\
-&= n_{\mathrm{in}} \sigma^2 \gamma^2 .
-
-\end{align}
-$$
-保持方差不变的一种方式是设置 $n_{\mathrm{in}} \sigma^2 = 1 .$ 现在考虑反向传播过程，类似地可以得出需要 $n_{\mathrm{out}} \sigma^2 = 1$ 其中 $n_{\mathrm{out}}$ 是该层的输出的数量，设输出端传回的梯度为$\delta_i=\frac{\partial J}{\partial o_i}$, 推导如下：
-
-输入 $x_j$ 接收到的梯度需要汇总所有输出单元传回的结果：
-$$
-\frac{\partial J}{\partial x_j}
-=
-\sum_{i=1}^{n_{\mathrm{out}}}
-w_{ij}\delta_i.
-$$
-假设 $\delta_i$ 相互独立，具有零均值和方差 $\tau^2$，并且独立于权重 $w_{ij}$，则反向梯度的均值为：
-$$
-\begin{align}
-E\left[\frac{\partial J}{\partial x_j}\right]
-&=
-\sum_{i=1}^{n_{\mathrm{out}}}E[w_{ij}\delta_i]\\
-&=
-\sum_{i=1}^{n_{\mathrm{out}}}E[w_{ij}]E[\delta_i]\\
-&=0.
-\end{align}
-$$
-其方差为：
-$$
-\begin{align}
-\operatorname{Var}\left[\frac{\partial J}{\partial x_j}\right]
-&=
-E\left[\left(\frac{\partial J}{\partial x_j}\right)^2\right]\\
-&=
-\sum_{i=1}^{n_{\mathrm{out}}}E[w_{ij}^2\delta_i^2]\\
-&=
-\sum_{i=1}^{n_{\mathrm{out}}}E[w_{ij}^2]E[\delta_i^2]\\
-&=
-n_{\mathrm{out}}\sigma^2\tau^2.
-\end{align}
-$$
-为了使梯度经过该层反向传播后仍保持方差 $\tau^2$，需要 $n_{\mathrm{out}}\sigma^2=1.$ 即前向传播要求 $n_{\mathrm{in}}\sigma^2=1$，反向传播要求 $n_{\mathrm{out}}\sigma^2=1$. 当 $n_{\mathrm{in}}\neq n_{\mathrm{out}}$ 时，两者无法同时严格满足。
-
-Xavier 初始化在二者之间取折中：
-$$
-\sigma^2
-=
-\frac{2}{n_{\mathrm{in}}+n_{\mathrm{out}}}.
-$$
-该选择使前向激活值和反向梯度的方差都不会随着网络层数快速地放大或缩小。一般地，Xavier 初始化从均值为零，方差为 $\sigma^2=\frac{2}{n_{\mathrm{in}}+n_{\mathrm{out}}}$ 的高斯分布中采样权重。我们也可以将其改为选择从均匀分布中抽取权重时的方差。 注意均匀分布$U(-a, a)$的方差为$\frac{a^2}{3}$，将$\frac{a^2}{3}$代入到$\sigma^2$的条件中，将得到初始化值域:
-
-$$U\left(-\sqrt{\frac{6}{n_\mathrm{in} + n_\mathrm{out}}}, \sqrt{\frac{6}{n_\mathrm{in} + n_\mathrm{out}}}\right).$$
-
-尽管在上述数学推导中使用“不存在非线性”的假设，但 Xavier 初始化方法在实践中被证明是有效的。
-
-
 ### 梯度分析中的奇异值与特征值
 普通特征值要求矩阵是方阵，因为 $\mathbf{M}\mathbf{v}$ 和 $\lambda\mathbf{v}$ 必须具有相同形状。若矩阵是实对称矩阵，则所有特征值都是实数，并且存在一组相互正交的特征向量。
 
@@ -1044,3 +969,81 @@ $$
 \mathbf v^\top\mathbf H\mathbf v=\lambda.
 $$
 所以 $\lambda$ 表示目标函数沿 $\mathbf v$ 方向的曲率：$\lambda>0$ 曲线向上弯、$\lambda<0$ 曲线向下弯、$\lambda\approx0$ 该方向比较平坦。在梯度为零的位置：若 Hessian 所有特征值都为正，则是严格局部极小值；若所有特征值都为负，则是严格局部极大值；若同时存在正、负特征值，则是鞍点；若存在零特征值，仅根据 Hessian 通常无法判断。
+
+
+## 网络对称性与参数初始化
+神经网络中一个设计问题是参数化的排列对称性：如果多个隐藏单元从完全相同的参数出发，它们会进行相同的计算、获得相同的梯度，并在训练中始终保持相同。这样，多个神经元实际上只相当于一个神经元。
+
+小批量随机梯度下降不会打破这种对称性，因为即使使用不同的小批量，两个单元在同一个小批量上看到的样本仍然相同。暂退法产生的随机噪声能够打破训练过程中的完全同步状态，但仍需使用合理的随机初始化来减轻网络结构上的排列对称性。
+
+### Xavier 初始化
+Xavier 初始化的作用是：（1）减轻同步状态；（2）控制前向传播中激活值和反向传播中梯度的大小，提升数值稳定性。
+
+假设没有使用非线性的全连接层输出 $o_{i} = \sum_{j=1}^{n_{in}} w_{ij} x_{j} .$
+权重 $w_{ij}$ 从同一分布中独立抽取，假设该分布具有零均值和方差 $\sigma^2$，这不意味着必须是高斯分布，只是均值和方差需要存在；假设输入层 $x_{j}$ 也具有零均值和方差 $\gamma^2$，并且它们独立于 $w_{ij}$ 且彼此独立；下面据此计算 $o_{i}$ 的均值和方差：
+$$
+\begin{align}
+E[o_{i}] & = \sum_{j=1}^{n_{\mathrm{in}}} E[w_{ij} x_{j}] \\
+& = \sum_{j=1}^{n_{\mathrm{in}}} E[w_{ij} ] E[x_{j}] \\
+& = 0. \\ 
+\end{align}
+$$
+$$
+\begin{align}
+Var[o_{i}] &= E[o_{i}^2] - (E[o_{i}])^2  \\
+&= \sum_{j=1}^{n_{\mathrm{in}}}E[w_{ij}^2x_{j}^2] - 0 \\
+&= \sum_{j=1}^{n_{\mathrm{in}}}E[w_{ij}^2]E[x_{j}^2] \\
+&= n_{\mathrm{in}} \sigma^2 \gamma^2 .
+
+\end{align}
+$$
+保持方差不变的一种方式是设置 $n_{\mathrm{in}} \sigma^2 = 1 .$ 现在考虑反向传播过程，类似地可以得出需要 $n_{\mathrm{out}} \sigma^2 = 1$ 其中 $n_{\mathrm{out}}$ 是该层的输出的数量，设输出端传回的梯度为$\delta_i=\frac{\partial J}{\partial o_i}$, 推导如下：
+
+输入 $x_j$ 接收到的梯度需要汇总所有输出单元传回的结果：
+$$
+\frac{\partial J}{\partial x_j}
+=
+\sum_{i=1}^{n_{\mathrm{out}}}
+w_{ij}\delta_i.
+$$
+假设 $\delta_i$ 相互独立，具有零均值和方差 $\tau^2$，并且独立于权重 $w_{ij}$，则反向梯度的均值为：
+$$
+\begin{align}
+E\left[\frac{\partial J}{\partial x_j}\right]
+&=
+\sum_{i=1}^{n_{\mathrm{out}}}E[w_{ij}\delta_i]\\
+&=
+\sum_{i=1}^{n_{\mathrm{out}}}E[w_{ij}]E[\delta_i]\\
+&=0.
+\end{align}
+$$
+其方差为：
+$$
+\begin{align}
+\operatorname{Var}\left[\frac{\partial J}{\partial x_j}\right]
+&=
+E\left[\left(\frac{\partial J}{\partial x_j}\right)^2\right]\\
+&=
+\sum_{i=1}^{n_{\mathrm{out}}}E[w_{ij}^2\delta_i^2]\\
+&=
+\sum_{i=1}^{n_{\mathrm{out}}}E[w_{ij}^2]E[\delta_i^2]\\
+&=
+n_{\mathrm{out}}\sigma^2\tau^2.
+\end{align}
+$$
+为了使梯度经过该层反向传播后仍保持方差 $\tau^2$，需要 $n_{\mathrm{out}}\sigma^2=1.$ 结合上一个结论可知，前向传播要求 $n_{\mathrm{in}}\sigma^2=1$，反向传播要求 $n_{\mathrm{out}}\sigma^2=1$. $n_{\mathrm{in}}\neq n_{\mathrm{out}}$ 时，两者无法同时严格满足。
+
+Xavier 初始化在二者之间取折中：
+$$
+\sigma^2
+=
+\frac{2}{n_{\mathrm{in}}+n_{\mathrm{out}}}.
+$$
+该选择使前向激活值和反向梯度的方差都不会随着网络层数快速地放大或缩小。一般地，Xavier 初始化从均值为零，方差为 $\sigma^2=\frac{2}{n_{\mathrm{in}}+n_{\mathrm{out}}}$ 的高斯分布中采样权重。我们也可以将其改为选择从均匀分布中抽取权重时的方差。 注意均匀分布$U(-a, a)$的方差为$\frac{a^2}{3}$，将$\frac{a^2}{3}$代入到$\sigma^2$的条件中，将得到初始化值域:
+
+$$U\left(-\sqrt{\frac{6}{n_\mathrm{in} + n_\mathrm{out}}}, \sqrt{\frac{6}{n_\mathrm{in} + n_\mathrm{out}}}\right).$$
+
+尽管在上述数学推导中使用“不存在非线性”的假设，但 Xavier 初始化方法在实践中被证明是有效的。
+
+### 其它权重初始化方法
+
