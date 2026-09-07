@@ -1259,3 +1259,152 @@ $$
 将输入权重放大 $c$ 倍、输出权重缩小为原来的 $1/c$，网络函数完全不变。这是一种连续的缩放对称性。它通常不会使两个神经元始终同步，但会导致同一个函数对应无穷多组参数，形成平坦方向并影响优化条件。权重衰减、归一化或约束参数尺度可以减轻其影响。
 
 图神经网络还可能表现出数据结构带来的对称性。例如在一个环形图中，如果所有节点具有相同初始特征，那么结构上对称的节点经过相同的消息传递后仍会获得相同表示。如果任务要求区分这些节点，就必须加入位置编码、锚点特征或其他外部信息。不过，如果任务本来就要求节点置换不变性，那么这种对称性是有意设计的。
+
+### 矩阵乘积的谱界与梯度稳定性
+
+深层网络的反向传播包含许多层雅可比矩阵的乘积。教材习题要求查找两个矩阵乘积的特征值界，其目的在于说明：每一层轻微的放大或压缩都可能在连乘中不断累积，最终造成梯度爆炸或梯度消失。不过，对于一般神经网络中的非对称、非正规矩阵，特征值只描述特征向量方向上的作用，梯度长度的变化应主要使用奇异值分析。
+
+#### 一般矩阵的特征值界
+
+设两个同阶方阵为 $\mathbf A$ 和 $\mathbf B$，并记 $\mathbf P=\mathbf A\mathbf B$。若 $\lambda_i(\mathbf P)$ 是 $\mathbf P$ 的一个特征值，对应单位特征向量为 $\mathbf v_i$，则：
+$$
+\mathbf P\mathbf v_i
+=
+\lambda_i(\mathbf P)\mathbf v_i,
+$$
+所以：
+$$
+|\lambda_i(\mathbf P)|
+=
+\|\mathbf P\mathbf v_i\|_2.
+$$
+根据最大、最小奇异值对任意单位向量的缩放界，可以得到：
+$$
+\sigma_{\min}(\mathbf P)
+\leq
+|\lambda_i(\mathbf P)|
+\leq
+\sigma_{\max}(\mathbf P).
+$$
+另一方面，矩阵乘积的奇异值满足：
+$$
+\sigma_{\max}(\mathbf A\mathbf B)
+\leq
+\sigma_{\max}(\mathbf A)\sigma_{\max}(\mathbf B),
+$$
+$$
+\sigma_{\min}(\mathbf A\mathbf B)
+\geq
+\sigma_{\min}(\mathbf A)\sigma_{\min}(\mathbf B).
+$$
+因此，$\mathbf A\mathbf B$ 的任意特征值都满足：
+$$
+\sigma_{\min}(\mathbf A)\sigma_{\min}(\mathbf B)
+\leq
+|\lambda_i(\mathbf A\mathbf B)|
+\leq
+\sigma_{\max}(\mathbf A)\sigma_{\max}(\mathbf B).
+$$
+若矩阵奇异，最小奇异值为 $0$，左侧只能给出平凡下界。这些乘积奇异值不等式可参考 [Stanford EE263 课程资料，第 14.14 题](https://web.stanford.edu/class/archive/ee/ee263/ee263.1082/notes/ee263coursereader.pdf)；谱范数等于最大奇异值以及 $\|\mathbf A\mathbf B\|_2\leq\|\mathbf A\|_2\|\mathbf B\|_2$ 的推导可参考 [MIT 18.06 课程笔记](https://web.mit.edu/18.06/www/Fall19/Lecture%20notes.pdf)。
+
+一般情况下，不能只根据 $\mathbf A$ 和 $\mathbf B$ 各自的特征值控制乘积的特征值。例如：
+$$
+\mathbf A=
+\begin{bmatrix}
+0&K\\
+0&0
+\end{bmatrix},
+\qquad
+\mathbf B=
+\begin{bmatrix}
+0&0\\
+R/K&0
+\end{bmatrix}.
+$$
+$\mathbf A$ 和 $\mathbf B$ 的特征值都为 $0$，但：
+$$
+\mathbf A\mathbf B
+=
+\begin{bmatrix}
+R&0\\
+0&0
+\end{bmatrix}
+$$
+具有特征值 $R$，且 $R$ 可以任意大。这个例子说明，非正规矩阵可能在并非自身特征向量的方向上产生很大的瞬时放大；各因子的特征值没有记录这种作用，而奇异值能够给出任意方向上长度变化的界。
+
+#### 对称正定矩阵的特例
+
+如果 $\mathbf A$ 和 $\mathbf B$ 都是对称正定矩阵，则 $\mathbf A\mathbf B$ 与对称正定矩阵 $\mathbf A^{1/2}\mathbf B\mathbf A^{1/2}$ 相似，因此其特征值都是正实数，并满足：
+$$
+\lambda_{\min}(\mathbf A)\lambda_{\min}(\mathbf B)
+\leq
+\lambda_i(\mathbf A\mathbf B)
+\leq
+\lambda_{\max}(\mathbf A)\lambda_{\max}(\mathbf B).
+$$
+该结论可以通过 Rayleigh 商理解：$\mathbf B$ 对任意方向的缩放位于其最小和最大特征值之间，$\mathbf A$ 又提供一层相同形式的界。但神经网络的层雅可比矩阵通常并非对称正定矩阵，因此不能普遍使用这个更强的特征值界。
+
+#### 深层网络中的梯度界
+
+设梯度在反向传播中依次经过 $L$ 个雅可比矩阵：
+$$
+\mathbf g_0
+=
+\mathbf M_1\mathbf M_2\cdots\mathbf M_L\mathbf g_L.
+$$
+反复使用乘积奇异值界，可以得到：
+$$
+\left(
+\prod_{\ell=1}^{L}\sigma_{\min}(\mathbf M_\ell)
+\right)
+\|\mathbf g_L\|_2
+\leq
+\|\mathbf g_0\|_2
+\leq
+\left(
+\prod_{\ell=1}^{L}\sigma_{\max}(\mathbf M_\ell)
+\right)
+\|\mathbf g_L\|_2.
+$$
+该式给出以下启示：
+
+- 若各层的最大奇异值长期小于 $1$，梯度上界会随深度指数级衰减。
+- 若许多层的最大奇异值大于 $1$，某些方向的梯度可能被指数级放大。
+- 若某层的最小奇异值很小或为 $0$，至少存在一些方向被严重压缩或完全丢弃。
+- 若各层的奇异值都接近 $1$，不同方向上的梯度更容易保持合适的尺度。
+
+即使每层的奇异值只略微偏离 $1$，例如都位于 $[1-\epsilon,1+\epsilon]$，经过 $L$ 层后，最坏情况下的整体缩放范围仍可能达到：
+$$
+(1-\epsilon)^L
+\quad\text{到}\quad
+(1+\epsilon)^L.
+$$
+因此，网络越深，每层很小的尺度偏差越可能在连乘中变成明显的梯度消失或爆炸。若各层都是可逆方阵，乘积的条件数还满足：
+$$
+\kappa_2(\mathbf M_1\cdots\mathbf M_L)
+\leq
+\prod_{\ell=1}^{L}\kappa_2(\mathbf M_\ell),
+$$
+说明每层不同方向之间的不均匀缩放也可能随深度累积。不过，这些乘积界描述的是最坏情况，实际缩放还取决于相邻层奇异方向之间的对齐关系和当前梯度的方向。
+
+#### 对参数初始化的启示
+
+Xavier 和 He 初始化控制的是独立性等假设下激活值与梯度的**平均方差**，可以避免整体数值尺度快速变化，但平均方差合适并不保证所有方向都具有合适的缩放。一个随机权重矩阵可能平均方差正常，同时具有很大的最大奇异值和很小的最小奇异值。
+
+正交初始化进一步控制方向差异。对于增益 $g=1$ 的方阵正交权重：
+$$
+\sigma_{\min}(\mathbf W)
+=
+\sigma_{\max}(\mathbf W)
+=
+1,
+$$
+所以纯线性层既不会放大也不会压缩任意输入方向。然而，加入激活函数后，每层的实际雅可比矩阵变为：
+$$
+\mathbf M_\ell
+=
+\operatorname{diag}\left(\phi'(\mathbf z_\ell)\right)\mathbf W_\ell.
+$$
+sigmoid 的导数最大只有 $1/4$，会持续压缩梯度；ReLU 则会将部分导数置为 $0$，使最坏情况下的最小奇异值可能为 $0$。因此，仅让权重矩阵正交并不足以保证整个非线性网络的梯度稳定，还需要同时考虑激活函数、权重增益、归一化和残差结构。
+
+> 总结：两个一般矩阵的乘积可以使用最大和最小奇异值给出可靠的特征值模界，但不能只根据各矩阵自身的特征值判断乘积行为。对于梯度传播，更重要的是让各层乃至整个网络雅可比矩阵的奇异值不过度偏离 $1$，使不同方向的梯度既不过度放大，也不过度压缩；这是比仅控制权重方差更严格的稳定性目标。
