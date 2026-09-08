@@ -1307,30 +1307,22 @@ $$
 $$
 若矩阵奇异，最小奇异值为 $0$，左侧只能给出平凡下界。这些乘积奇异值不等式可参考 [Stanford EE263 课程资料，第 14.14 题](https://web.stanford.edu/class/archive/ee/ee263/ee263.1082/notes/ee263coursereader.pdf)；谱范数等于最大奇异值以及 $\|\mathbf A\mathbf B\|_2\leq\|\mathbf A\|_2\|\mathbf B\|_2$ 的推导可参考 [MIT 18.06 课程笔记](https://web.mit.edu/18.06/www/Fall19/Lecture%20notes.pdf)。
 
-一般情况下，不能只根据 $\mathbf A$ 和 $\mathbf B$ 各自的特征值控制乘积的特征值。例如：
+谱范数 $\|\mathbf A\|_2$ 表示矩阵对任意非零向量的 $L_2$ 长度所能产生的最大放大倍数：$\|\mathbf A\|_2=\max_{\mathbf x\neq\mathbf0}\frac{\|\mathbf A\mathbf x\|_2}{\|\mathbf x\|_2}$。若 $\mathbf A=\mathbf U\mathbf\Sigma\mathbf V^\top$ 是奇异值分解，则左右的正交变换不改变向量长度，矩阵的缩放完全由 $\mathbf\Sigma$ 的对角元素决定；任意输入向量经过变换后的长度至多被最大奇异值 $\sigma_{\max}(\mathbf A)$ 放大，并且当输入取对应的右奇异向量时恰好达到这一上界。具体推导为：由于正交矩阵不改变 $L_2$ 范数，令 ( $\mathbf z=\mathbf V^\top\mathbf x$)，则：
 $$
-\mathbf A=
-\begin{bmatrix}
-0&K\\
-0&0
-\end{bmatrix},
-\qquad
-\mathbf B=
-\begin{bmatrix}
-0&0\\
-R/K&0
-\end{bmatrix}.
-$$
-$\mathbf A$ 和 $\mathbf B$ 的特征值都为 $0$，但：
-$$
-\mathbf A\mathbf B
+\|\mathbf A\mathbf x\|_2^2
 =
-\begin{bmatrix}
-R&0\\
-0&0
-\end{bmatrix}
+\|\mathbf\Sigma\mathbf z\|_2^2
+=
+\sum_i \sigma_i^2 z_i^2
+\leq
+\sigma_1^2\sum_i z_i^2
+=
+\sigma_1^2\|\mathbf x\|_2^2.
 $$
-具有特征值 $R$，且 $R$ 可以任意大。这个例子说明，非正规矩阵可能在并非自身特征向量的方向上产生很大的瞬时放大；各因子的特征值没有记录这种作用，而奇异值能够给出任意方向上长度变化的界。
+
+因此有 $\|\mathbf A\|_2=\sigma_{\max}(\mathbf A)=\sqrt{\lambda_{\max}(\mathbf A^\top\mathbf A)}$。直观上，单位球经 $\mathbf A$ 变为椭球，谱范数就是其最长半轴的长度。它通常不等于最大特征值模：例如 $\begin{bmatrix}0&K\\0&0\end{bmatrix}$ 的特征值都为 $0$，但最大奇异值和谱范数都是 $K$；这说明特征值只描述保持方向不变的特殊方向，谱范数则描述所有方向中的最严重长度放大。
+
+非正规矩阵可能在并非自身特征向量的方向上产生很大的瞬时放大；各因子的特征值没有记录这种作用，而奇异值能够给出任意方向上长度变化的界。
 
 #### 对称正定矩阵的特例
 
