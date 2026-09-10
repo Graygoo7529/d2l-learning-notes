@@ -1446,35 +1446,33 @@ $$
 \right).
 $$
 
-暂时令 $\beta=0$，则更新量满足：
+当 $\|\mathbf w_t^{(\ell)}\|_2$ 和 $\beta$ 固定时，梯度范数 $\|\mathbf g_t^{(\ell)}\|_2$ 越大，分母越大，局部缩放系数 $r_t^{(\ell)}$ 越小；梯度范数越小，$r_t^{(\ell)}$ 越大。因此，LARS 会缩小梯度较大层的有效学习率 $\gamma_t r_t^{(\ell)}$，并增大梯度较小层的有效学习率，以抵消不同层之间梯度整体尺度的差异。
+
+令本次参数变化为 $\Delta\mathbf w_t^{(\ell)}=\mathbf w_{t+1}^{(\ell)}-\mathbf w_t^{(\ell)}$。将局部缩放系数代入更新式，可得：
 $$
 \begin{aligned}
-\|\Delta\mathbf w_t^{(\ell)}\|_2
-&=
-\gamma_t
-\eta
-\frac{\|\mathbf w_t^{(\ell)}\|_2}
-{\|\mathbf g_t^{(\ell)}\|_2}
-\|\mathbf g_t^{(\ell)}\|_2\\
+\frac{\|\Delta\mathbf w_t^{(\ell)}\|_2}
+{\|\mathbf w_t^{(\ell)}\|_2}
 &=
 \gamma_t\eta
-\|\mathbf w_t^{(\ell)}\|_2.
+\frac{
+\|\mathbf g_t^{(\ell)}+\beta\mathbf w_t^{(\ell)}\|_2
+}
+{
+\|\mathbf g_t^{(\ell)}\|_2
++\beta\|\mathbf w_t^{(\ell)}\|_2
+}\\
+&\leq
+\gamma_t\eta,
 \end{aligned}
 $$
-因此：
+其中不等式来自三角不等式 $\|\mathbf g_t^{(\ell)}+\beta\mathbf w_t^{(\ell)}\|_2\leq\|\mathbf g_t^{(\ell)}\|_2+\beta\|\mathbf w_t^{(\ell)}\|_2$。因此，在忽略动量时，无论某层的梯度范数多大，该层单次更新相对于当前权重的比例都满足：
 $$
 \frac{\|\Delta\mathbf w_t^{(\ell)}\|_2}
 {\|\mathbf w_t^{(\ell)}\|_2}
-=
+\leq
 \gamma_t\eta.
 $$
-梯度范数在这个比值中被抵消，说明 LARS 直接控制每一层参数的相对更新幅度。某层梯度过大时，其局部缩放系数自动减小，避免参数一步移动过远；某层梯度较小时，局部缩放系数相应增大，避免该层长期停滞。考虑权重衰减时，由三角不等式还有：
-$$
-\|\mathbf g_t^{(\ell)}+\beta\mathbf w_t^{(\ell)}\|_2
-\leq
-\|\mathbf g_t^{(\ell)}\|_2
-+\beta\|\mathbf w_t^{(\ell)}\|_2,
-$$
-所以相对更新量仍被 $\gamma_t\eta$ 控制。该方法最初用于稳定大批量训练，因为增大批量后通常需要提高全局学习率，而各层能够承受的更新幅度并不相同。具体方法可参考 [Large Batch Training of Convolutional Networks](https://arxiv.org/abs/1708.03888)。
+这说明 LARS 控制的是参数的相对更新量，而不是梯度的绝对大小：较大的有限梯度会自动配合较小的局部缩放系数，从而避免参数仅因梯度尺度过大而一步移动过远。具体方法可参考 [Large Batch Training of Convolutional Networks](https://arxiv.org/abs/1708.03888)。
 
-LARS 修正的是**参数更新的尺度**，而不是反向传播产生梯度的过程本身。它可以阻止一个有限但很大的梯度立即造成过大的参数更新，却不会改变导致梯度爆炸或消失的雅可比矩阵连乘，也无法恢复已经下溢为零的梯度；如果前向激活、损失或梯度已经变成 `inf` 或 `NaN`，梯度的方向和大小信息通常已经丢失，此时一般需要回退到有效检查点，并结合更小的学习率、合理初始化、归一化、残差结构或梯度裁剪重新训练。
+使用动量时，这个上界适用于当前经过 LARS 缩放的更新项，不一定适用于累积历史更新后的完整动量。该方法最初用于稳定大批量训练，因为增大批量后通常需要提高全局学习率，而各层能够承受的更新幅度并不相同。
